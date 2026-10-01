@@ -14,14 +14,11 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
 
 function buildSqlForPg(sqliteSql) {
   let sql = sqliteSql;
-  sql = sql.replace(/AUTOINCREMENT/gi, 'GENERATED ALWAYS AS IDENTITY');
-  sql = sql.replace(/datetime\('now'\)/gi, 'NOW()');
   sql = sql.replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/gi, 'SERIAL PRIMARY KEY');
   sql = sql.replace(/\bINTEGER PRIMARY KEY\b/gi, 'SERIAL PRIMARY KEY');
-  sql = sql.replace(/REFERENCES usuarios\(id\) ON DELETE CASCADE/gi, 'REFERENCES usuarios(id) ON DELETE CASCADE');
-  sql = sql.replace(/REFERENCES categorias_habilidades\(id\) ON DELETE CASCADE/gi, 'REFERENCES categorias_habilidades(id) ON DELETE CASCADE');
-  sql = sql.replace(/REFERENCES proyectos\(id\) ON DELETE CASCADE/gi, 'REFERENCES proyectos(id) ON DELETE CASCADE');
-  sql = sql.replace(/REFERENCES habilidades\(id\) ON DELETE CASCADE/gi, 'REFERENCES habilidades(id) ON DELETE CASCADE');
+  sql = sql.replace(/AUTOINCREMENT/gi, 'GENERATED ALWAYS AS IDENTITY');
+  sql = sql.replace(/datetime\('now'\)/gi, 'NOW()');
+  sql = sql.replace(/\bINSERT OR IGNORE INTO\b/gi, 'INSERT INTO');
   return sql;
 }
 
