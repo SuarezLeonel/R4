@@ -1,0 +1,16 @@
+{
+  "name": "portfolio-admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Portfolio Web SPA Administrable - Full Stack React + Node.js/Express + SQL",
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "build:client": "cd client && npm run build",
+    "start:server": "cd server && npm run start"
+  },
+  "author": "",
+  "license": "MIT"
+}
