@@ -88,7 +88,13 @@ export async function query(sql, params = []) {
 
   if (DB_DRIVER === 'pg') {
     const pool = await getPgPool();
-    const pgSql = convertPlaceholdersToPg(sql);
+    let pgSql = convertPlaceholdersToPg(sql);
+    
+    const upperSql = pgSql.trim().toUpperCase();
+    if (upperSql.startsWith('INSERT') && !upperSql.includes('RETURNING') && !upperSql.includes('PROYECTO_HABILIDADES')) {
+      pgSql += ' RETURNING id';
+    }
+
     const result = await pool.query(pgSql, normalizedParams);
     if (isSelect) {
       return result.rows || [];
