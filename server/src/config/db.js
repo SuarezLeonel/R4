@@ -7,9 +7,12 @@ const __dirname = dirname(__filename);
 
 dotenv.config({ path: join(__dirname, '..', '..', '.env') });
 
-const DB_DRIVER = process.env.DB_DRIVER || 'sqlite';
+function getDriver() {
+  return (process.env.DB_DRIVER || 'sqlite').toLowerCase();
+}
 
 let dbInstance = null;
+let mysqlPoolInstance = null;
 
 function convertPlaceholdersToPg(sql) {
   let idx = 0;
@@ -21,7 +24,7 @@ function convertPlaceholdersToPg(sql) {
 
 function isSelectQuery(sql) {
   const trimmed = sql.trim().toLowerCase();
-  return trimmed.startsWith('select') || trimmed.startsWith('with');
+  return trimmed.startsWith('select') || trimmed.startsWith('with') || trimmed.startsWith('show') || trimmed.startsWith('describe');
 }
 
 async function getSqliteDb() {
@@ -62,17 +65,44 @@ async function getPgPool() {
   return dbInstance;
 }
 
+async function getMysqlPool() {
+  if (mysqlPoolInstance) return mysqlPoolInstance;
+  const mysql = await import('mysql2/promise');
+  const DATABASE_URL = process.env.DATABASE_URL;
+  if (!DATABASE_URL) throw new Error('DATABASE_URL no definido para MySQL/MariaDB');
+
+  const poolOptions = {
+    uri: DATABASE_URL,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
+  };
+
+  // Soporte para SSL si es requerido por hostings como PlanetScale, Aiven, TiDB, Clever Cloud, etc.
+  if (process.env.DB_SSL === 'true' || DATABASE_URL.includes('ssl=') || DATABASE_URL.includes('sslmode=')) {
+    poolOptions.ssl = { rejectUnauthorized: false };
+  }
+
+  mysqlPoolInstance = mysql.createPool(poolOptions);
+  return mysqlPoolInstance;
+}
+
 export async function getDb() {
-  if (DB_DRIVER === 'sqlite') return getSqliteDb();
-  if (DB_DRIVER === 'pg') return getPgPool();
-  throw new Error(`DB_DRIVER no soportado: ${DB_DRIVER}`);
+  const driver = getDriver();
+  if (driver === 'sqlite') return getSqliteDb();
+  if (driver === 'pg') return getPgPool();
+  if (driver === 'mysql' || driver === 'mariadb') return getMysqlPool();
+  throw new Error(`DB_DRIVER no soportado: ${driver}`);
 }
 
 export async function query(sql, params = []) {
   const normalizedParams = Array.isArray(params) ? params : [params];
   const isSelect = isSelectQuery(sql);
+  const driver = getDriver();
 
-  if (DB_DRIVER === 'sqlite') {
+  if (driver === 'sqlite') {
     const db = await getSqliteDb();
     const stmt = db.prepare(sql);
     if (isSelect) {
@@ -86,7 +116,19 @@ export async function query(sql, params = []) {
     };
   }
 
-  if (DB_DRIVER === 'pg') {
+  if (driver === 'mysql' || driver === 'mariadb') {
+    const pool = await getMysqlPool();
+    const [result] = await pool.execute(sql, normalizedParams);
+    if (isSelect) {
+      return result || [];
+    }
+    return {
+      changes: result ? result.affectedRows : 0,
+      lastInsertRowid: result ? result.insertId : null,
+    };
+  }
+
+  if (driver === 'pg') {
     const pool = await getPgPool();
     let pgSql = convertPlaceholdersToPg(sql);
     
@@ -108,7 +150,7 @@ export async function query(sql, params = []) {
     };
   }
 
-  throw new Error(`DB_DRIVER no soportado: ${DB_DRIVER}`);
+  throw new Error(`DB_DRIVER no soportado: ${driver}`);
 }
 
 export default { query, getDb };

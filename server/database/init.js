@@ -89,6 +89,36 @@ async function initDatabase() {
     return pool;
   }
 
+  if (DB_DRIVER === 'mysql' || DB_DRIVER === 'mariadb') {
+    const mysql = await import('mysql2/promise');
+    const DATABASE_URL = process.env.DATABASE_URL;
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL no definido para MySQL/MariaDB');
+    }
+
+    const mysqlSchemaPath = join(__dirname, 'schema.mysql.sql');
+    let mysqlSchema = readFileSync(mysqlSchemaPath, 'utf-8');
+    mysqlSchema = mysqlSchema.replace(/\$2b\$10\$[A-Za-z0-9./]{53}/g, passwordHash);
+
+    const connectionOptions = {
+      uri: DATABASE_URL,
+      multipleStatements: true
+    };
+
+    if (process.env.DB_SSL === 'true' || DATABASE_URL.includes('ssl=') || DATABASE_URL.includes('sslmode=')) {
+      connectionOptions.ssl = { rejectUnauthorized: false };
+    }
+
+    const connection = await mysql.createConnection(connectionOptions);
+    console.log('[DB] Conectado a MySQL/MariaDB. Ejecutando esquema y seeds...');
+
+    await connection.query(mysqlSchema);
+    await connection.end();
+
+    console.log('[DB] MySQL/MariaDB inicializada correctamente');
+    return true;
+  }
+
   throw new Error(`DB_DRIVER no soportado: ${DB_DRIVER}`);
 }
 
